@@ -31,6 +31,8 @@ services:
     build: .
     env_file: .env
     environment:
+      # Overrides for running inside the container network, as a production build.
+      NODE_ENV: production
       DATABASE_URL: postgresql://app:app@postgres:5432/saas
       SECRETS_SOURCE: local
     ports:
