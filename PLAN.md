@@ -41,11 +41,12 @@ ProcessedWebhookEvent id, provider, eventId, type, processedAt                  
 
 ## Tenant isolation (the main mechanism)
 
-- A migration turns on `ENABLE` and `FORCE ROW LEVEL SECURITY` for the tables marked [RLS]. Each gets a policy: `org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid` (on `organisations` it's `id = …`).
-- `withTenant(orgId, fn)` opens a Prisma transaction and runs `SET LOCAL ROLE app_tenant` and `set_config('app.current_org_id', orgId, true)`. Then it runs `fn`. Both settings end when the transaction does.
-- **Why switch roles:** the local Postgres user is a superuser, and superusers skip RLS entirely, even with FORCE. `app_tenant` is a NOLOGIN role created by a migration that has no bypass rights. That keeps RLS on in every environment while using a single `DATABASE_URL`.
+- A migration turns on `ROW LEVEL SECURITY` for the tables marked [RLS]. Each gets a policy: `org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid` (on `organisations` it's `id = …`).
+- `dbContext.tenant(orgId, fn)` opens a Prisma transaction and runs `SET LOCAL ROLE app_tenant` and `set_config('app.current_org_id', orgId, true)`. Then it runs `fn`. Both settings end when the transaction does.
+- **Why switch roles:** superusers and table owners skip RLS. Locally the app user is a superuser, and on RDS it would be the table owner. `app_tenant` is a NOLOGIN role created by a migration with no bypass rights, so the policies always apply to it. That works the same in every environment with a single `DATABASE_URL`.
+- (Changed during the build: the tables don't use `FORCE ROW LEVEL SECURITY`. With FORCE, the owner-connected "system" reads below would return nothing on RDS but everything locally as superuser. Restricting through the role keeps both environments the same.)
 - If no org is set, the policy compares against NULL, so queries return nothing. That fails safe.
-- **Only cross-tenant read:** `GET /orgs` (which orgs am I in?) runs outside `withTenant`, filtered by `userId`. The README documents this.
+- **Only cross-tenant read:** `GET /orgs` (which orgs am I in?) runs outside the tenant context, filtered by `userId`. The README documents this.
 - **Tests that prove it:** inside org A's context, reads of org B's memberships, invites, usage and subscription return nothing, and inserting a row with org B's id is rejected by the policy's `WITH CHECK`.
 
 ## Webhook idempotency
@@ -61,7 +62,7 @@ If the event was already processed, the unique constraint rejects the insert (Pr
 
 `enforcePlanLimit('members' | 'monthlyUsage')` middleware runs after the membership check:
 
-- `members`: current members plus pending invites must be under `plan.maxMembers`. Used on invite create and invite accept.
+- `members`: current members plus pending invites must be under `plan.maxMembers`. Used on invite create. A pending invite reserves a seat, so accepting it needs no second check.
 - `monthlyUsage`: this month's total plus the requested quantity must not exceed `plan.monthlyUsageQuota`. Used on `POST /usage`.
 - Over the limit returns `403 PLAN_LIMIT_EXCEEDED`.
 
@@ -85,7 +86,7 @@ DELETE /orgs/:orgId/members/:memberId [admin+ or self]
 POST   /orgs/:orgId/invites           [admin+, members limit]  returns the token once
 GET    /orgs/:orgId/invites           [admin+]
 DELETE /orgs/:orgId/invites/:inviteId [admin+]
-POST   /orgs/:orgId/invites/accept    [authenticated, email must match, members limit]
+POST   /orgs/:orgId/invites/accept    [authenticated, email must match]
 GET    /plans
 GET    /plans/:planId
 GET    /orgs/:orgId/subscription           [member+]
