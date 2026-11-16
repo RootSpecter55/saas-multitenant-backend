@@ -9,6 +9,7 @@ import { invitesRoutes } from './modules/invites/invites.routes';
 import { membershipsRoutes } from './modules/memberships/memberships.routes';
 import { organisationsRoutes } from './modules/organisations/organisations.routes';
 import { plansRoutes } from './modules/plans/plans.routes';
+import { subscriptionsRoutes, webhooksRoutes } from './modules/subscriptions/subscriptions.routes';
 import { usageRoutes } from './modules/usage/usage.routes';
 
 export function createApp(container: Container = buildContainer()): Express {
@@ -18,6 +19,9 @@ export function createApp(container: Container = buildContainer()): Express {
   app.use(pinoHttp({ logger }));
 
   app.get('/health', (_req, res) => sendData(res, { status: 'ok' }));
+
+  // Before express.json(): webhook signatures are verified over the raw body.
+  app.use('/webhooks', webhooksRoutes(c.subscriptions));
 
   app.use(express.json({ limit: '100kb' }));
 
@@ -32,6 +36,10 @@ export function createApp(container: Container = buildContainer()): Express {
   app.use(
     '/orgs/:orgId/usage',
     usageRoutes(c.usage, authenticate, requireOrgRole, enforcePlanLimit),
+  );
+  app.use(
+    '/orgs/:orgId/subscription',
+    subscriptionsRoutes(c.subscriptions, authenticate, requireOrgRole),
   );
   app.use('/orgs', organisationsRoutes(c.organisations, authenticate, requireOrgRole));
 

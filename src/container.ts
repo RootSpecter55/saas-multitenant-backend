@@ -18,16 +18,23 @@ import { PlansController } from './modules/plans/plans.controller';
 import { PlanRepository } from './modules/plans/plans.repository';
 import { PlansService } from './modules/plans/plans.service';
 import { createEnforcePlanLimit, PlanLimitService } from './modules/subscriptions/plan-limits';
-import { SubscriptionRepository } from './modules/subscriptions/subscriptions.repository';
+import { SubscriptionsController } from './modules/subscriptions/subscriptions.controller';
+import {
+  ProcessedWebhookEventRepository,
+  SubscriptionRepository,
+} from './modules/subscriptions/subscriptions.repository';
+import { SubscriptionsService } from './modules/subscriptions/subscriptions.service';
 import { UsageController } from './modules/usage/usage.controller';
 import { UsageRepository } from './modules/usage/usage.repository';
 import { UsageService } from './modules/usage/usage.service';
 import { createAuthProvider } from './providers/auth';
+import { createPaymentProvider } from './providers/payment';
 
 /** Composition root: builds every provider, repository, service and controller in one place. */
 export function buildContainer() {
   const config = getConfig();
   const authProvider = createAuthProvider(config);
+  const paymentProvider = createPaymentProvider(config);
 
   const repos = {
     users: new UserRepository(),
@@ -37,6 +44,7 @@ export function buildContainer() {
     subscriptions: new SubscriptionRepository(),
     invites: new InviteRepository(),
     usage: new UsageRepository(),
+    webhookEvents: new ProcessedWebhookEventRepository(),
   };
 
   const authService = new AuthService(dbContext, repos.users, authProvider);
@@ -57,6 +65,14 @@ export function buildContainer() {
     config.INVITE_TTL_HOURS,
   );
   const usageService = new UsageService(dbContext, repos.usage, repos.subscriptions);
+  const subscriptionsService = new SubscriptionsService(
+    dbContext,
+    repos.subscriptions,
+    repos.plans,
+    repos.webhookEvents,
+    paymentProvider,
+    { successUrl: config.CHECKOUT_SUCCESS_URL, cancelUrl: config.CHECKOUT_CANCEL_URL },
+  );
   const planLimitService = new PlanLimitService(
     dbContext,
     repos.subscriptions,
@@ -76,6 +92,7 @@ export function buildContainer() {
       plans: new PlansController(plansService),
       invites: new InvitesController(invitesService),
       usage: new UsageController(usageService),
+      subscriptions: new SubscriptionsController(subscriptionsService),
     },
   };
 }

@@ -15,7 +15,8 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "webhook:fake": "tsx scripts/send-fake-webhook.ts"
   },
   "repository": {
     "type": "git",
