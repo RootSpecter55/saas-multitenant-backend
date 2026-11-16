@@ -2,6 +2,17 @@ import { execSync } from 'node:child_process';
 import { Client } from 'pg';
 import './setup-env';
 
+/** Runs a CLI command quietly, printing its output only if it fails. */
+function run(command: string) {
+  try {
+    execSync(command, { stdio: 'pipe', env: process.env });
+  } catch (err) {
+    const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
+    process.stderr.write(`${stdout ?? ''}${stderr ?? ''}`);
+    throw err;
+  }
+}
+
 /** Creates the test database if it does not exist, then applies migrations and seeds plans. */
 export default async function globalSetup() {
   const url = new URL(process.env.DATABASE_URL!);
@@ -15,6 +26,6 @@ export default async function globalSetup() {
   if (exists.rowCount === 0) await admin.query(`CREATE DATABASE "${dbName}"`);
   await admin.end();
 
-  execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });
-  execSync('npx prisma db seed', { stdio: 'inherit', env: process.env });
+  run('npx prisma migrate deploy');
+  run('npx prisma db seed');
 }

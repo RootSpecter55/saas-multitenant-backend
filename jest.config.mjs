@@ -1,5 +1,3 @@
-import type { Config } from 'jest';
-
 const shared = {
   preset: 'ts-jest',
   testEnvironment: 'node',
@@ -7,7 +5,8 @@ const shared = {
   clearMocks: true,
 };
 
-const config: Config = {
+/** @type {import('jest').Config} */
+export default {
   projects: [
     { ...shared, displayName: 'unit', roots: ['<rootDir>/tests/unit'] },
     {
@@ -19,5 +18,3 @@ const config: Config = {
     },
   ],
 };
-
-export default config;
