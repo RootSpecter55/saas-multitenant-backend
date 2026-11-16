@@ -6,7 +6,7 @@
     "test": "jest --runInBand",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/scripts/start-with-secrets.js",
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch scripts/start-with-secrets.ts",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
