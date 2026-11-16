@@ -5,12 +5,14 @@ import { logger } from './common/logger';
 import { sendData } from './common/response';
 import { buildContainer, type Container } from './container';
 import { authRoutes } from './modules/auth/auth.routes';
+import { invitesRoutes } from './modules/invites/invites.routes';
 import { membershipsRoutes } from './modules/memberships/memberships.routes';
 import { organisationsRoutes } from './modules/organisations/organisations.routes';
 import { plansRoutes } from './modules/plans/plans.routes';
+import { usageRoutes } from './modules/usage/usage.routes';
 
 export function createApp(container: Container = buildContainer()): Express {
-  const { controllers: c, authenticate, requireOrgRole } = container;
+  const { controllers: c, authenticate, requireOrgRole, enforcePlanLimit } = container;
   const app = express();
   app.disable('x-powered-by');
   app.use(pinoHttp({ logger }));
@@ -23,6 +25,14 @@ export function createApp(container: Container = buildContainer()): Express {
   app.use('/plans', plansRoutes(c.plans));
   // Nested org routers first: each authenticates once and ends the request.
   app.use('/orgs/:orgId/members', membershipsRoutes(c.memberships, authenticate, requireOrgRole));
+  app.use(
+    '/orgs/:orgId/invites',
+    invitesRoutes(c.invites, authenticate, requireOrgRole, enforcePlanLimit),
+  );
+  app.use(
+    '/orgs/:orgId/usage',
+    usageRoutes(c.usage, authenticate, requireOrgRole, enforcePlanLimit),
+  );
   app.use('/orgs', organisationsRoutes(c.organisations, authenticate, requireOrgRole));
 
   app.use(notFoundHandler);
